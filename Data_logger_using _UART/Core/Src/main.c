@@ -63,6 +63,22 @@ static void ASCII_convertion(char *val,uint16_t ADC_value);
 /* USER CODE BEGIN 0 */
 
 uint16_t ADC_value =0;
+char val[7];
+
+// ADC completion callback
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+{
+	ADC_value = HAL_ADC_GetValue(&hadc1);
+	ASCII_convertion(val,ADC_value);//converts each byte of ADC value into ASCII character
+	HAL_UART_Transmit_IT(&huart1,(uint8_t*) val,sizeof(val));
+
+}
+
+// UART transmission completion callback
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+	HAL_ADC_Start_IT(&hadc1);
+}
 /* USER CODE END 0 */
 
 /**
@@ -74,7 +90,7 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
-	char val[7];
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -99,6 +115,10 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  HAL_ADC_Start_IT(&hadc1);
+//  HAL_ADC_Stop_IT(&hadc1);
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -106,15 +126,6 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  HAL_ADC_Start(&hadc1);
-	  HAL_ADC_PollForConversion(&hadc1,100);
-	  ADC_value = HAL_ADC_GetValue(&hadc1);
-	  HAL_ADC_Stop(&hadc1);
-
-	  HAL_Delay(500);
-
-	  ASCII_convertion(val,ADC_value);   //converts each byte of adc value into ASCII character
-	  HAL_UART_Transmit(&huart1,(uint8_t*) val,sizeof(val),100);
 
     /* USER CODE BEGIN 3 */
   }
