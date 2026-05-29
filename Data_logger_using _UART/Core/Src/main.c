@@ -42,6 +42,8 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
@@ -53,8 +55,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
-static void ASCII_convertion(char *val,uint16_t ADC_value);
-
+static void MX_TIM2_Init(void);
+static void ASCII_conversion(char *val,uint16_t ADC_value);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -62,22 +64,31 @@ static void ASCII_convertion(char *val,uint16_t ADC_value);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-uint16_t ADC_value =0;
+volatile uint16_t ADC_value =0;
+volatile uint8_t ADC_flag=0;
+volatile int8_t UART_flag=1;
+
 char val[7];
 
 // ADC completion callback
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	ADC_value = HAL_ADC_GetValue(&hadc1);
-	ASCII_convertion(val,ADC_value);//converts each byte of ADC value into ASCII character
-	HAL_UART_Transmit_IT(&huart1,(uint8_t*) val,sizeof(val));
+	ADC_flag = 1;
 
+
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
+	  HAL_ADC_Start_IT(&hadc1);
 }
 
 // UART transmission completion callback
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-	HAL_ADC_Start_IT(&hadc1);
+//	HAL_ADC_Start_IT(&hadc1);
+	UART_flag = 1;
 }
 /* USER CODE END 0 */
 
@@ -113,10 +124,10 @@ int main(void)
   MX_GPIO_Init();
   MX_ADC1_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_ADC_Start_IT(&hadc1);
-//  HAL_ADC_Stop_IT(&hadc1);
+  HAL_TIM_Base_Start_IT(&htim2);
 
 
   /* USER CODE END 2 */
@@ -126,14 +137,25 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+	 if(ADC_flag && UART_flag)
+	 {
+		 ADC_flag=0;
+		 UART_flag=0;
+		 ASCII_conversion(val,ADC_value); //converts each byte of ADC value into ASCII character
+		 HAL_UART_Transmit_IT(&huart1,(uint8_t*) val,sizeof(val));
+	 }
 
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
 
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
 
-static void ASCII_convertion(char *val,uint16_t ADC_value)
+static void ASCII_conversion(char *val,uint16_t ADC_value)
 {
 	val[0] = (ADC_value / 1000) % 10 + '0';
 	val[1] = (ADC_value / 100)  % 10 + '0';
@@ -143,11 +165,6 @@ static void ASCII_convertion(char *val,uint16_t ADC_value)
 	val[5] = '\n';
 	val[6] = '\0';
 }
-
-/**
-  * @brief System Clock Configuration
-  * @retval None
-  */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -238,6 +255,51 @@ static void MX_ADC1_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 7199;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 199;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -253,7 +315,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 9600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
