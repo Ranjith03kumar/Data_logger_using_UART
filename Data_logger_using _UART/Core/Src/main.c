@@ -56,7 +56,7 @@ static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM2_Init(void);
-static void ASCII_conversion(char *val,uint16_t ADC_value);
+static void ASCII_conversion(char *val,uint16_t ADC_value,uint16_t timestamp);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -66,9 +66,10 @@ static void ASCII_conversion(char *val,uint16_t ADC_value);
 
 volatile uint16_t ADC_value =0;
 volatile uint8_t ADC_flag=0;
-volatile int8_t UART_flag=1;
+volatile uint8_t UART_flag=1;
+volatile uint16_t timestamp=0;
 
-char val[7];
+char val[11];
 
 // ADC completion callback
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
@@ -81,7 +82,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
-	  HAL_ADC_Start_IT(&hadc1);
+	 timestamp+=20;
+	 HAL_ADC_Start_IT(&hadc1);
 }
 
 // UART transmission completion callback
@@ -141,7 +143,7 @@ int main(void)
 	 {
 		 ADC_flag=0;
 		 UART_flag=0;
-		 ASCII_conversion(val,ADC_value); //converts each byte of ADC value into ASCII character
+		 ASCII_conversion(val,ADC_value,timestamp); //converts each byte of ADC value into ASCII character
 		 HAL_UART_Transmit_IT(&huart1,(uint8_t*) val,sizeof(val));
 	 }
 
@@ -155,15 +157,19 @@ int main(void)
   * @retval None
   */
 
-static void ASCII_conversion(char *val,uint16_t ADC_value)
+static void ASCII_conversion(char *val,uint16_t ADC_value,uint16_t timestamp)
 {
-	val[0] = (ADC_value / 1000) % 10 + '0';
-	val[1] = (ADC_value / 100)  % 10 + '0';
-	val[2] = (ADC_value / 10)   % 10 + '0';
-	val[3] = (ADC_value % 10) + '0';
-	val[4] = '\r';
-	val[5] = '\n';
-	val[6] = '\0';
+	val[0] = (timestamp / 1000) % 10 + '0';
+	val[1] = (timestamp / 100)  % 10 + '0';
+	val[2] = (timestamp / 10)   % 10 + '0';
+	val[3] = (timestamp % 10) + '0';
+	val[4] = ',';
+	val[5] = (ADC_value / 1000) % 10 + '0';
+	val[6] = (ADC_value / 100)  % 10 + '0';
+	val[7] = (ADC_value / 10)   % 10 + '0';
+	val[8] = (ADC_value % 10) + '0';
+	val[9] = '\r';
+	val[10] = '\n';
 }
 void SystemClock_Config(void)
 {
@@ -243,7 +249,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
